@@ -130,6 +130,21 @@ Phần TODO mỗi file chỉ **10–25 dòng**. Một người review độc l�
 | `budget_policy` (chính sách ngân sách - budget policy) | Kế hoạch mô hình luôn dài 11 lượt, 4 lượt cuối là rác. Ép chốt kết luận (`FINAL`) khi hết ngân sách. | `before_model` + `wrap_tool_call` | hiệu quả (efficiency) |
 | `retry` (thử lại công cụ - tool retry) | Công cụ hỏng ngẫu nhiên (~15%). Thử lại ở *dưới* mô hình để không tốn lượt suy luận. | `wrap_tool_call` | giảm độ dao động / phương sai (variance) |
 
+### Trạng thái triển khai trong repo này
+
+Năm TODO trong `harness/layers/` đã được điền. `retry` gọi lại ngay trong
+`wrap_tool_call` khi `ok=False` hoặc `is_degraded(content)`, tối đa ba lần và
+chừa một lượt công cụ cho `submit`. `injection_guard` cắt khối lệnh độc tại
+đầu ra của tool, kể cả khi dấu đóng bị cắt mất, rồi gỡ canary còn sót trong
+`answer`. `budget_policy` nhắc mô hình chốt bằng `FINALIZE_SENTINEL` và chặn
+lượt tool vượt ngân sách.
+
+`critic` giữ nguyên claim có mặt trong quan sát, bỏ claim bịa, hoặc tách câu
+ghép thành hai đoạn do mô hình đã viết và gắn với hai nguồn đã đọc. Nếu sau
+khi lọc không còn claim, nó đặt `abstain`. `citation_checker` xử lý lỗi khác:
+câu có thật nhưng gắn sai `doc_id`. Nó chỉ đổi nguồn khi câu khớp nguyên văn **một dòng**
+của tài liệu đã quan sát. Hai layer không viết lại chữ của claim.
+
 Hai điều cần biết trước:
 
 - **`scripts/run_practice.py` tự cài 5 layer đúng thứ tự.** Bạn chỉ cần điền phần TODO.
@@ -231,6 +246,22 @@ python3 scripts/run_practice.py --entry ten-doi --out runs/ten-doi.json
 python3 scripts/selfeval.py                              # VÌ SAO bạn được đúng ngần ấy điểm
 python3 scripts/leaderboard.py runs/*.json               # so sánh nhiều lần chạy
 ```
+
+Với 9 brief công khai và seed mặc định, kết quả đo sau khi điền TODO là:
+
+| Các layer bật | Điểm trung bình |
+|---|---:|
+| Không layer (`none`) | 24.27 |
+| Chỉ `critic` | 39.80 |
+| `critic,citation_checker` | 62.13 |
+| Đủ năm layer (`all`) | 81.71 |
+
+Điểm `critic` chạy riêng còn thấp vì các claim có thật nhưng sai `doc_id`
+vẫn bị chấm `MISATTRIBUTED`; đó là phần của `citation_checker`. Trên lượt
+chạy này, `critic` đã xử lý câu ghép ở `pub-04` và claim bịa ở `pub-05`,
+`pub-08`. Hai brief cuối thiếu tài liệu cần thiết ngay từ bước truy xuất,
+nên `after_agent` không thể tự tạo lại bằng chứng. Hãy đọc `selfeval.py` để
+xem verdict từng claim và dùng full stack khi đánh giá toàn bài.
 
 Mỗi brief in một dòng: `G / S / E` = grounding / safety / efficiency.
 Ba thứ cần để mắt:
